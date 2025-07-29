@@ -3,14 +3,13 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { RemuxModal } from "@/components/remux-modal";
 import { ConfigModal } from "@/components/config-modal";
+import { TrackTooltip } from "@/components/track-tooltip";
 import {
-  FolderOpen,
   Film,
   HardDrive,
   Languages,
@@ -18,6 +17,10 @@ import {
   ExternalLink,
   RefreshCw,
   Settings,
+  Volume2,
+  Subtitles,
+  AlertTriangle,
+  CheckCircle,
 } from "lucide-react";
 import { scanDirectory, remuxFile } from "./actions";
 import type { MediaFile } from "./types";
@@ -88,7 +91,7 @@ export default function MediaLibraryInspector() {
   };
 
   const formatFileSize = (bytes: number) => {
-    return (bytes / 1024 ** 3).toFixed(2);
+    return (bytes / 1024 ** 3).toFixed(1);
   };
 
   const getRecommendations = (file: MediaFile) => {
@@ -130,35 +133,37 @@ export default function MediaLibraryInspector() {
     return recommendations;
   };
 
-  const getRecommendationReason = (file: MediaFile, recommendation: string) => {
-    if (recommendation === "remux") {
-      return "Fix unknown language tags";
+  // const getUnknownTracksCount = (file: MediaFile) => {
+  //   const unknownAudio = file.audioTracks.filter(
+  //     (track) =>
+  //       !track.language ||
+  //       track.language === "und" ||
+  //       track.language === "unknown",
+  //   ).length;
+  //   const unknownSubtitles = file.subtitleTracks.filter(
+  //     (track) =>
+  //       !track.language ||
+  //       track.language === "und" ||
+  //       track.language === "unknown",
+  //   ).length;
+  //   return unknownAudio + unknownSubtitles;
+  // };
+
+  const getFormatBadgeVariant = (format: string) => {
+    const f = format.toLowerCase();
+    if (f.includes("matroska") || f.includes("mp4") || f.includes("mov")) {
+      return "default";
     }
-    if (recommendation === "reencode") {
-      const reasons = [];
-      if (file.sizeGB > 20) {
-        reasons.push(`Large file size (${formatFileSize(file.size)} GB)`);
-      }
-      const format = file.format.toLowerCase();
-      if (
-        !format.includes("matroska") &&
-        !format.includes("mp4") &&
-        !format.includes("mov")
-      ) {
-        reasons.push("Unsupported format");
-      }
-      return reasons.join(", ");
-    }
-    return "";
+    return "destructive";
   };
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="container mx-auto p-6">
-        <div className="flex items-center justify-between mb-8">
+      <div className="container mx-auto p-4">
+        <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
-            <Film className="h-8 w-8 text-primary" />
-            <h1 className="text-3xl font-bold">Media Library Inspector</h1>
+            <Film className="h-7 w-7 text-primary" />
+            <h1 className="text-2xl font-bold">Media Library Inspector</h1>
           </div>
           <div className="flex items-center gap-2">
             <Button
@@ -173,14 +178,8 @@ export default function MediaLibraryInspector() {
           </div>
         </div>
 
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <FolderOpen className="h-5 w-5" />
-              Directory Path
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
+        <Card className="mb-4">
+          <CardContent className="pt-4">
             <div className="flex gap-2">
               <Input
                 placeholder="/movies or /home/user/media (try any path for demo)"
@@ -196,186 +195,177 @@ export default function MediaLibraryInspector() {
                     Scanning...
                   </>
                 ) : (
-                  "Scan Directory"
+                  "Scan"
                 )}
               </Button>
             </div>
-            <p className="text-sm text-muted-foreground mt-2">
-              This is a demo version. Enter any path to see sample media files
-              with analysis.
+            <p className="text-xs text-muted-foreground mt-2">
+              Demo version - Enter any path to see sample media files
             </p>
           </CardContent>
         </Card>
 
         {mediaFiles.length > 0 && (
-          <div className="space-y-4">
-            <h2 className="text-2xl font-semibold mb-4">
-              Found {mediaFiles.length} media files
-            </h2>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-lg font-semibold">
+                Found {mediaFiles.length} files
+              </h2>
+              <div className="text-sm text-muted-foreground">
+                {
+                  mediaFiles.filter((f) => getRecommendations(f).length > 0)
+                    .length
+                }{" "}
+                need attention
+              </div>
+            </div>
 
-            {mediaFiles.map((file, index) => {
-              const recommendations = getRecommendations(file);
+            <div className="space-y-1">
+              {mediaFiles.map((file, index) => {
+                const recommendations = getRecommendations(file);
+                // const unknownCount = getUnknownTracksCount(file);
+                const hasIssues = recommendations.length > 0;
 
-              return (
-                <Card key={index} className="overflow-hidden">
-                  <CardHeader>
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <CardTitle className="flex items-center gap-2 text-lg">
-                          <FileVideo className="h-5 w-5" />
-                          {file.name}
-                        </CardTitle>
-                        <p className="text-sm text-muted-foreground mt-1">
-                          {file.path}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Badge
-                          variant="outline"
-                          className="flex items-center gap-1"
-                        >
-                          <HardDrive className="h-3 w-3" />
-                          {formatFileSize(file.size)} GB
-                        </Badge>
-                        <Badge variant="secondary">{file.format}</Badge>
-                      </div>
-                    </div>
-                  </CardHeader>
-
-                  <CardContent className="space-y-4">
-                    <div className="grid md:grid-cols-2 gap-4">
-                      <div>
-                        <h4 className="font-semibold mb-2 flex items-center gap-2">
-                          <Languages className="h-4 w-4" />
-                          Audio Tracks ({file.audioTracks.length})
-                        </h4>
-                        <div className="space-y-1">
-                          {file.audioTracks.map((track, i) => (
-                            <div
-                              key={i}
-                              className="text-sm flex items-center justify-between"
-                            >
-                              <span>{track.codec}</span>
-                              <Badge
-                                variant={
-                                  !track.language || track.language === "und"
-                                    ? "destructive"
-                                    : "default"
-                                }
-                                className="text-xs"
-                              >
-                                {track.language || "Unknown"}
-                              </Badge>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div>
-                        <h4 className="font-semibold mb-2">
-                          Subtitle Tracks ({file.subtitleTracks.length})
-                        </h4>
-                        <div className="space-y-1">
-                          {file.subtitleTracks.length > 0 ? (
-                            file.subtitleTracks.map((track, i) => (
-                              <div
-                                key={i}
-                                className="text-sm flex items-center justify-between"
-                              >
-                                <span>{track.codec}</span>
-                                <Badge
-                                  variant={
-                                    !track.language || track.language === "und"
-                                      ? "destructive"
-                                      : "default"
-                                  }
-                                  className="text-xs"
-                                >
-                                  {track.language || "Unknown"}
-                                </Badge>
-                              </div>
-                            ))
+                return (
+                  <Card
+                    key={index}
+                    className={`transition-colors h-16 ${hasIssues ? "border-orange-200 dark:border-orange-800" : ""}`}
+                  >
+                    <CardContent className="p-3 h-full">
+                      <div className="flex items-center h-full gap-3">
+                        {/* Status Icon */}
+                        <div className="flex-shrink-0">
+                          {hasIssues ? (
+                            <AlertTriangle className="h-4 w-4 text-orange-500" />
                           ) : (
-                            <p className="text-sm text-muted-foreground">
-                              No subtitles
-                            </p>
+                            <CheckCircle className="h-4 w-4 text-green-500" />
+                          )}
+                        </div>
+
+                        {/* File Name */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <FileVideo className="h-4 w-4 flex-shrink-0" />
+                            <h3 className="font-medium text-sm truncate">
+                              {file.name}
+                            </h3>
+                          </div>
+                          <div className="text-xs text-muted-foreground truncate mt-0.5">
+                            {file.path.split("/").slice(-2, -1)[0] || ""}
+                          </div>
+                        </div>
+
+                        {/* File Size */}
+                        <div className="flex-shrink-0 text-center min-w-[60px]">
+                          <div className="flex items-center gap-1 text-xs">
+                            <HardDrive className="h-3 w-3" />
+                            <span className="font-medium">
+                              {formatFileSize(file.size)}
+                            </span>
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            GB
+                          </div>
+                        </div>
+
+                        {/* Audio Tracks */}
+                        <div className="flex-shrink-0 min-w-[50px]">
+                          <TrackTooltip tracks={file.audioTracks} type="audio">
+                            <div className="flex items-center gap-1 text-xs cursor-help">
+                              <Volume2 className="h-3 w-3" />
+                              <span className="font-medium">
+                                {file.audioTracks.length}
+                              </span>
+                              {file.audioTracks.some(
+                                (t) =>
+                                  !t.language ||
+                                  t.language === "und" ||
+                                  t.language === "unknown",
+                              ) && <span className="text-orange-500">!</span>}
+                            </div>
+                          </TrackTooltip>
+                        </div>
+
+                        {/* Subtitle Tracks */}
+                        <div className="flex-shrink-0 min-w-[50px]">
+                          <TrackTooltip
+                            tracks={file.subtitleTracks}
+                            type="subtitle"
+                          >
+                            <div className="flex items-center gap-1 text-xs cursor-help">
+                              <Subtitles className="h-3 w-3" />
+                              <span className="font-medium">
+                                {file.subtitleTracks.length}
+                              </span>
+                              {file.subtitleTracks.some(
+                                (t) =>
+                                  !t.language ||
+                                  t.language === "und" ||
+                                  t.language === "unknown",
+                              ) && <span className="text-orange-500">!</span>}
+                            </div>
+                          </TrackTooltip>
+                        </div>
+
+                        {/* Format */}
+                        <div className="flex-shrink-0">
+                          <Badge
+                            variant={getFormatBadgeVariant(file.format)}
+                            className="text-xs px-2 py-0.5 h-5"
+                          >
+                            {file.format
+                              .split(",")[0]
+                              .replace("matroska", "MKV")
+                              .toUpperCase()}
+                          </Badge>
+                        </div>
+
+                        {/* Actions */}
+                        <div className="flex-shrink-0 flex gap-1 min-w-[80px] justify-end">
+                          {recommendations.includes("remux") && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleRemuxClick(file)}
+                              disabled={remuxing === file.path}
+                              className="h-6 px-2 text-xs"
+                              title="Fix language tags"
+                            >
+                              {remuxing === file.path ? (
+                                <RefreshCw className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <Languages className="h-3 w-3" />
+                              )}
+                            </Button>
+                          )}
+                          {recommendations.includes("reencode") && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleReencode(file.path)}
+                              className="h-6 px-2 text-xs"
+                              title="Re-encode in HandBrake"
+                            >
+                              <ExternalLink className="h-3 w-3" />
+                            </Button>
                           )}
                         </div>
                       </div>
-                    </div>
-
-                    {recommendations.length > 0 && (
-                      <>
-                        <Separator />
-                        <div>
-                          <h4 className="font-semibold mb-3">
-                            Recommendations
-                          </h4>
-                          <div className="flex flex-wrap gap-2">
-                            {recommendations.includes("remux") && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleRemuxClick(file)}
-                                disabled={remuxing === file.path}
-                                className="flex-col h-auto py-2"
-                              >
-                                {remuxing === file.path ? (
-                                  <>
-                                    <RefreshCw className="h-4 w-4 mb-1 animate-spin" />
-                                    <span className="text-xs">Remuxing...</span>
-                                  </>
-                                ) : (
-                                  <>
-                                    <span className="text-sm font-medium">
-                                      Remux
-                                    </span>
-                                    <span className="text-xs text-muted-foreground">
-                                      {getRecommendationReason(file, "remux")}
-                                    </span>
-                                  </>
-                                )}
-                              </Button>
-                            )}
-                            {recommendations.includes("reencode") && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleReencode(file.path)}
-                                className="flex-col h-auto py-2"
-                              >
-                                <div className="flex items-center gap-1 mb-1">
-                                  <ExternalLink className="h-4 w-4" />
-                                  <span className="text-sm font-medium">
-                                    Re-encode
-                                  </span>
-                                </div>
-                                <span className="text-xs text-muted-foreground">
-                                  {getRecommendationReason(file, "reencode")}
-                                </span>
-                              </Button>
-                            )}
-                          </div>
-                        </div>
-                      </>
-                    )}
-                  </CardContent>
-                </Card>
-              );
-            })}
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
           </div>
         )}
 
         {mediaFiles.length === 0 && !loading && (
           <Card>
-            <CardContent className="text-center py-12">
-              <Film className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <p className="text-muted-foreground">
-                Enter a directory path and click &quot;Scan Directory&quot; to
-                inspect your media library
-              </p>
-              <p className="text-sm text-muted-foreground mt-2">
-                This demo will show sample files with realistic media analysis
+            <CardContent className="text-center py-8">
+              <Film className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
+              <p className="text-muted-foreground text-sm">
+                Enter a directory path and click &quot;Scan&quot; to inspect
+                your media library
               </p>
             </CardContent>
           </Card>
